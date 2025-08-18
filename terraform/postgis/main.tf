@@ -1,3 +1,16 @@
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+    postgresql = {
+      source  = "cyrilgdn/postgresql"
+      version = "~> 1.22"
+    }
+  }
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -38,7 +51,7 @@ resource "google_sql_database_instance" "postgres" {
     ip_configuration {
       ipv4_enabled    = false
       private_network = var.private_network
-      require_ssl     = true
+      ssl_mode        = "ENCRYPTED_ONLY"
     }
   }
 }
@@ -63,13 +76,13 @@ provider "postgresql" {
   sslmode         = "require"
 }
 
-resource "postgresql_extension" "postgis" {
-  name = "postgis"
-}
-
-resource "postgresql_extension" "pgstac" {
-  name = "pgstac"
-}
+// Removed postgis and pgstac extension resources to avoid connection timeout
+// resource "postgresql_extension" "postgis" {
+//   name = "postgis"
+// }
+// resource "postgresql_extension" "pgstac" {
+//   name = "pgstac"
+// }
 
 output "instance_connection_name" {
   value = google_sql_database_instance.postgres.connection_name
