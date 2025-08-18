@@ -1,0 +1,7 @@
+{
+  "sentinel-1-grd": "https://earth-search.aws.element84.com/v1",
+  "sentinel-1-rtc": "https://planetarycomputer.microsoft.com/api/stac/v1",
+  "sentinel-2-l2a": "https://earth-search.aws.element84.com/v1",
+  "sentinel-2-l1c": "https://earth-search.aws.element84.com/v1",
+  "landsat-c2-l2": "https://planetarycomputer.microsoft.com/api/stac/v1"
+}
