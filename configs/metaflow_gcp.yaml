@@ -1,0 +1,3 @@
+METAFLOW_DEFAULT_METADATA: service
+METAFLOW_SERVICE_URL: "https://metaflow-service.example.com"
+PGSTAC_URI: "postgresql://metaflow:DB_PASSWORD@127.0.0.1:5432/pgstac"
