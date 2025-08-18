@@ -24,7 +24,7 @@ resource "google_service_account_iam_binding" "workload_identity" {
 
 resource "google_sql_database_instance" "postgres" {
   name             = var.instance_name
-  database_version = "POSTGRES_15"
+  database_version = var.db_version
   region           = var.region
   root_password    = var.db_password
 

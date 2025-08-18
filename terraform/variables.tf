@@ -31,6 +31,12 @@ variable "db_password" {
   type        = string
 }
 
+variable "db_version" {
+  description = "PostgreSQL major version (e.g. POSTGRES_14 or POSTGRES_15)"
+  type        = string
+  default     = "POSTGRES_15"
+}
+
 variable "db_tier" {
   description = "Machine type for the Cloud SQL instance"
   type        = string

@@ -6,7 +6,7 @@ This repository provisions a managed PostgreSQL service on **Google Cloud SQL** 
 
 The Terraform configuration in [`terraform/`](terraform) creates:
 
-- A PostgreSQL 15 Cloud SQL instance with a `pgstac` database.
+- A PostgreSQL Cloud SQL instance (PostgreSQL 15 by default) with a `pgstac` database.
 - A service account with the minimal roles required to access the instance (`roles/cloudsql.client`).
 - Workload Identity bindings so a Kubernetes service account can authenticate as the Cloud SQL service account.
 - PostGIS and `pgstac` extensions using the PostgreSQL provider.
@@ -27,6 +27,7 @@ The Terraform configuration in [`terraform/`](terraform) creates:
    - `region` – region where the instance is created.
    - `private_network` – self‑link of the VPC used for private IP.
    - `db_password` – password for the default database user.
+   - `db_version` – PostgreSQL major version (`POSTGRES_14`, `POSTGRES_15`, ...).
    - `db_tier` – machine type (e.g. `db-custom-2-8192` for 2 vCPU / 8 GB).
    - `db_disk_size_gb` – storage size in GB.
 
@@ -40,6 +41,7 @@ The Terraform configuration in [`terraform/`](terraform) creates:
      -var region="<REGION>" \
      -var private_network="<VPC_SELF_LINK>" \
      -var db_password="<STRONG_PASSWORD>" \
+     -var db_version="POSTGRES_14" \
      -var db_tier="db-custom-2-8192" \
      -var db_disk_size_gb=10
    ```
@@ -48,7 +50,7 @@ The Terraform configuration in [`terraform/`](terraform) creates:
 
 ## 2. GKE access (Workload Identity + Auth Proxy)
 
-[`terraform/kubernetes/cloudsql-auth-proxy.yaml`](terraform/kubernetes/cloudsql-auth-proxy.yaml) shows how to run a Metaflow task with the Cloud SQL Auth Proxy sidecar. Replace the placeholders (project, region, instance name, password, service account e‑mail) and deploy:
+[`terraform/kubernetes/cloudsql-auth-proxy.yaml`](terraform/kubernetes/cloudsql-auth-proxy.yaml) shows how to run a Metaflow task with the Cloud SQL Auth Proxy sidecar. It contains sample values for the `psql-metaflow-default-0a1fa1aa` instance; update the service account and password as needed before deploying:
 
 ```bash
 kubectl apply -f terraform/kubernetes/cloudsql-auth-proxy.yaml

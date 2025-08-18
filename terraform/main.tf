@@ -24,6 +24,7 @@ module "postgis" {
   database_name       = var.database_name
   db_user             = var.db_user
   db_password         = var.db_password
+  db_version          = var.db_version
   db_tier            = var.db_tier
   db_disk_size_gb    = var.db_disk_size_gb
   private_network     = var.private_network

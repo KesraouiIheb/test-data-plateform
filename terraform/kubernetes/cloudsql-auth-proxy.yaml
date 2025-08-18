@@ -4,7 +4,7 @@ metadata:
   name: metaflow-postgres
   namespace: default
   annotations:
-    iam.gke.io/gcp-service-account: "REPLACE_WITH_SA_EMAIL"
+    iam.gke.io/gcp-service-account: "metaflow-postgres-client@eofusion-466316.iam.gserviceaccount.com"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -24,13 +24,13 @@ spec:
       serviceAccountName: metaflow-postgres
       containers:
       - name: flow
-        image: gcr.io/PROJECT_ID/metaflow:latest
+        image: gcr.io/eofusion-466316/metaflow:latest
         env:
         - name: DATABASE_URL
-          value: "postgresql://metaflow:DB_PASSWORD@127.0.0.1:5432/pgstac"
+          value: "postgresql://metaflow:REPLACE_WITH_DB_PASSWORD@127.0.0.1:5432/pgstac"
       - name: cloud-sql-proxy
         image: gcr.io/cloudsql-docker/gce-proxy:1.33.1
         args:
         - /cloud_sql_proxy
         - -enable_iam_login
-        - -instances=PROJECT_ID:REGION:INSTANCE_NAME=tcp:5432
+        - -instances=eofusion-466316:europe-west4:psql-metaflow-default-0a1fa1aa=tcp:5432
