@@ -36,8 +36,7 @@ class MetadataManager:
         self.catalog_path = catalog_path
         self.catalog = None
 
-        if pgstac_dsn : 
-           self.pypgstac_client = PgStacLoader(pgstac_dsn)
+        self.pypgstac_client = PgStacLoader(pgstac_dsn) if pgstac_dsn else None
             
 
     def _get_catalog_path(self) -> str:
@@ -113,7 +112,8 @@ class MetadataManager:
             collection.normalize_hrefs(collection_path)
             collection.save(dest_href=collection_dir)
 
-        #self.pypgstac_client.load_collection(collection_path)
+        if self.pypgstac_client:
+            self.pypgstac_client.load_collection(collection_path)
         
 
         return collection
@@ -180,7 +180,8 @@ class MetadataManager:
         item.save_object(dest_href=str(item_path))
 
         
-        #self.pypgstac_client.load_item(str(item_path))  
+        if self.pypgstac_client:
+            self.pypgstac_client.load_item(str(item_path))
 
         # try:
         #     Path(item_path).unlink() ## TODO :  removing the json files from the disk is crucial, we need to make sure it's an atomic process

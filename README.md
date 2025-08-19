@@ -88,3 +88,84 @@ python main.py
 ```bash
 pytest
 ```
+
+## 9. Self-hosted Postgres and pgSTAC VMs
+
+An alternative to Cloud SQL is to run the databases on self-managed VMs. Terraform
+configuration and bootstrap scripts live under [`terraform/postgres_vms/`](terraform/postgres_vms).
+
+### Provision the VMs
+
+```bash
+cd terraform/postgres_vms
+terraform init
+terraform apply \
+  -var project_id="<PROJECT_ID>"
+```
+
+Two compute instances are created with startup scripts that install PostgreSQL:
+
+- **ingest-postgres** – standard PostgreSQL instance for ingestion flows.
+- **pgstac-postgres** – PostgreSQL with PostGIS and the pgSTAC schema.
+
+Passwords can be supplied via the `INGEST_PASSWORD` and `PGSTAC_PASSWORD`
+metadata variables or by editing the shell scripts before apply.
+
+### Database creation scripts
+
+Standalone scripts in [`scripts/db`](scripts/db) show how to create the
+databases and load `pgstac.sql.gz` manually if needed:
+
+```bash
+# On the Postgres VM
+INGEST_PASSWORD=strongpass ./scripts/db/init-postgres.sh
+
+# On the pgSTAC VM
+PGSTAC_PASSWORD=strongpass ./scripts/db/init-pgstac.sh
+```
+
+### Connecting from Metaflow
+
+Expose the connection strings as environment variables before running a flow:
+
+```bash
+export INGEST_DB_DSN="postgresql://ingest_user:<PASSWORD>@<INGEST_VM_IP>:5432/ingest"
+export PGSTAC_DSN="postgresql://pgstac_user:<PASSWORD>@<PGSTAC_VM_IP>:5432/pgstac"
+python metaflow_flows/sentinel2_ingestion_flow.py run
+```
+
+The `download_items` utility writes STAC metadata to pgSTAC when `PGSTAC_DSN`
+is set. The flow's `write_to_db` step records processed items into the
+`ingestion_log` table and prints row counts from both databases.
+
+### Team access
+
+Developers can connect using the VM's external IP addresses:
+
+```bash
+ssh <user>@<INGEST_VM_IP>
+psql "$INGEST_DB_DSN"
+# or
+pgadmin4 --server "<PGSTAC_VM_IP>"
+```
+
+### Collaboration workflow
+
+1. Create feature branches from `main`.
+2. Commit Terraform and SQL/script changes.
+3. Open pull requests for review before applying infrastructure changes.
+
+### Verifying the setup
+
+1. After provisioning, ensure `psql` connects to both VMs and lists databases.
+2. Run `python metaflow_flows/sentinel2_ingestion_flow.py run` with the DSNs set.
+   The flow prints counts from the ingestion and pgSTAC databases.
+3. Query data manually, e.g.:
+
+```sql
+-- Ingestion database
+SELECT * FROM ingestion_log LIMIT 5;
+
+-- pgSTAC database
+SELECT id FROM pgstac.collections;
+```
