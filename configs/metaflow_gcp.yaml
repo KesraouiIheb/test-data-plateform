@@ -1,3 +1,4 @@
 METAFLOW_DEFAULT_METADATA: service
 METAFLOW_SERVICE_URL: "https://metaflow-service.example.com"
-PGSTAC_URI: "postgresql://metaflow:DB_PASSWORD@127.0.0.1:5432/pgstac"
+INGEST_DB_DSN: "postgresql://ingest_user:DB_PASSWORD@INGEST_IP:5432/ingest"
+PGSTAC_DSN: "postgresql://pgstac_user:DB_PASSWORD@PGSTAC_IP:5432/pgstac"
