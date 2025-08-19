@@ -1,7 +1,8 @@
 from pathlib import Path
 import pandas as pd
 from typing import List, Optional, Dict
-import json 
+import json
+import os
 from src.data_ingestion.stac_clients import get_stac_client_from_collection
 from src.data_ingestion.geodata import download_utils
 from src.data_ingestion.metadata.manager import MetadataManager
@@ -77,7 +78,8 @@ def download_items(
     download_type: str = "bbox"
 ) -> Dict:
     downloader_utils = download_utils.STACAssetDownloaderUtils()
-    manager = MetadataManager(catalog_path=metadata_path,pgstac_dsn=None)
+    pgstac_dsn = os.getenv("PGSTAC_DSN")
+    manager = MetadataManager(catalog_path=metadata_path, pgstac_dsn=pgstac_dsn)
     collection = manager.load_or_create_collection(collection_name)
     local_storage = Path(local_storage_path)
 
