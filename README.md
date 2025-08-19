@@ -1,90 +1,98 @@
 # Data Platform Infrastructure
 
-This repository provisions a managed PostgreSQL service on **Google Cloud SQL** and exposes it to Metaflow workloads running on **GKE**.  The setup enables the `pgSTAC` API and PostGIS extensions while keeping the database lifecycle independent from the Metaflow cluster.
+This repository provisions two self-hosted PostgreSQL databases on Google Cloud Compute Engine and shows how Metaflow flows can interact with them.
 
-## 1. Provision Cloud SQL with Terraform
+## 1. Provision Postgres VMs
 
-The Terraform configuration in [`terraform/`](terraform) creates:
+Prerequisites:
+- [gcloud CLI](https://cloud.google.com/sdk/docs/install)
+- [Terraform](https://developer.hashicorp.com/terraform/install)
+- `gcloud auth login`
+- `gcloud config set project <PROJECT_ID>`
 
-- A PostgreSQL 15 Cloud SQL instance with a `pgstac` database.
-- A service account with the minimal roles required to access the instance (`roles/cloudsql.client`).
-- Workload Identity bindings so a Kubernetes service account can authenticate as the Cloud SQL service account.
-- PostGIS and `pgstac` extensions using the PostgreSQL provider.
-
-### Usage
+Enable the Compute Engine API:
 
 ```bash
-cd terraform
+gcloud services enable compute.googleapis.com
+```
+
+Provision the VMs:
+
+```bash
+cd terraform/postgres_vms
 terraform init
 terraform apply \
   -var project_id="<PROJECT_ID>" \
-  -var region="<REGION>" \
-  -var private_network="<VPC_SELF_LINK>" \
-  -var db_password="<STRONG_PASSWORD>"
+  -var region="us-central1" \
+  -var zone="us-central1-a"
 ```
 
-Outputs include the instance connection name and service account e‑mail used by GKE.
-
-## 2. GKE access (Workload Identity + Auth Proxy)
-
-[`terraform/kubernetes/cloudsql-auth-proxy.yaml`](terraform/kubernetes/cloudsql-auth-proxy.yaml) shows how to run a Metaflow task with the Cloud SQL Auth Proxy sidecar. Replace the placeholders (project, region, instance name, password, service account e‑mail) and deploy:
+After apply completes, capture the IP addresses:
 
 ```bash
-kubectl apply -f terraform/kubernetes/cloudsql-auth-proxy.yaml
+terraform output -raw ingest_ip
+terraform output -raw pgstac_ip
 ```
 
-The pod uses Workload Identity and connects to Cloud SQL over a local TCP port exposed by the proxy.
+## 2. Database setup
 
-## 3. Metaflow configuration
-
-[`configs/metaflow_gcp.yaml`](configs/metaflow_gcp.yaml) contains environment variables consumed by Metaflow flows. Set `PGSTAC_URI` to match your database credentials and ensure the file is loaded when launching flows:
+Startup scripts create the databases and users automatically. To rerun them or change passwords:
 
 ```bash
-export $(cat configs/metaflow_gcp.yaml | xargs)
+# Ingestion database
+ gcloud compute scp scripts/db/init-postgres.sh ingest-postgres: --zone us-central1-a
+ gcloud compute ssh ingest-postgres --zone us-central1-a -- \
+   'INGEST_PASSWORD=strongpass bash init-postgres.sh'
+
+# pgSTAC database
+ gcloud compute scp scripts/db/init-pgstac.sh pgstac-postgres: --zone us-central1-a
+ gcloud compute ssh pgstac-postgres --zone us-central1-a -- \
+   'PGSTAC_PASSWORD=strongpass bash init-pgstac.sh'
+```
+
+## 3. Run Metaflow flows
+
+Export connection strings and run the flow:
+
+```bash
+export INGEST_DB_DSN="postgresql://ingest_user:strongpass@$(terraform -chdir=terraform/postgres_vms output -raw ingest_ip):5432/ingest"
+export PGSTAC_DSN="postgresql://pgstac_user:strongpass@$(terraform -chdir=terraform/postgres_vms output -raw pgstac_ip):5432/pgstac"
+
 python metaflow_flows/sentinel2_ingestion_flow.py run
 ```
 
-## 4. Enable PostGIS and pgSTAC
-
-The Terraform module installs the extensions automatically. If manual setup is preferred, connect with `psql` and run:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS pgstac;
-```
-
-## 5. Least‑privilege access
-
-Only the dedicated service account created by Terraform has the `roles/cloudsql.client` permission. Kubernetes pods authenticate using Workload Identity with that account; no passwords or keys are stored in the cluster.
-
-## 6. Performance & operations tips
-
-- Choose an appropriate machine tier (`db-custom-*`) and enable automatic backups.
-- Use connection pooling (e.g. `pgbouncer`) for high‑concurrency workloads.
-- Monitor the instance with Cloud SQL insights and set up alerts for CPU, storage and connection metrics.
-
-## 7. Developer workflow
-
-Developers can iterate on Metaflow flows locally and then deploy to GKE:
+## 4. Accessing the VMs
 
 ```bash
-# Run locally
-python metaflow_flows/sentinel2_ingestion_flow.py run
+# SSH
+ gcloud compute ssh ingest-postgres --zone us-central1-a
+ gcloud compute ssh pgstac-postgres --zone us-central1-a
 
-# Execute on GKE (Metaflow CLI must be configured for GCP)
-python metaflow_flows/sentinel2_ingestion_flow.py --with kubernetes run
+# psql from your workstation
+ psql "$INGEST_DB_DSN"
+ psql "$PGSTAC_DSN"
 ```
 
-## 8. Testing
+## 5. Collaboration workflow
 
-A minimal smoke test prints a greeting:
+1. Create feature branches from `main`.
+2. Commit Terraform, shell script, or Metaflow changes.
+3. Open pull requests for review before applying infrastructure changes.
+
+## 6. Verification
+
+```bash
+# Check databases
+psql "$INGEST_DB_DSN" -c '\dt'
+psql "$PGSTAC_DSN" -c 'SELECT count(*) FROM pgstac.collections;'
+
+# Run flow and verify output
+python metaflow_flows/sentinel2_ingestion_flow.py run
+```
+
+## 7. Testing
 
 ```bash
 python main.py
-```
-
-`pytest` can be executed even when no tests exist to validate the environment:
-
-```bash
 pytest
 ```

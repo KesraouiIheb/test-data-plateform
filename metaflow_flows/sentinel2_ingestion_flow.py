@@ -154,12 +154,48 @@ class Sentinel2IngestionFlow(FlowSpec):
     @step
     def download_join(self, inputs):
         self.all_downloads = [inp.download_result for inp in inputs]
+        self.next(self.write_to_db)
+
+    @step
+    def write_to_db(self):
+        import os
+        import psycopg2
+
+        dsn = os.environ.get("INGEST_DB_DSN")
+        if dsn is None:
+            raise RuntimeError("INGEST_DB_DSN environment variable is required")
+
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "CREATE TABLE IF NOT EXISTS ingestion_log (item_id TEXT PRIMARY KEY, port TEXT)"
+                )
+                for rec in self.all_downloads:
+                    if rec:
+                        cur.execute(
+                            "INSERT INTO ingestion_log (item_id, port) VALUES (%s, %s) ON CONFLICT (item_id) DO NOTHING",
+                            (rec["item_id"], rec["port"]),
+                        )
+                cur.execute("SELECT COUNT(*) FROM ingestion_log")
+                self.ingest_count = cur.fetchone()[0]
+
+        pgstac_dsn = os.environ.get("PGSTAC_DSN")
+        if pgstac_dsn:
+            with psycopg2.connect(pgstac_dsn) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT count(*) FROM pgstac.collections")
+                    self.pgstac_collections = cur.fetchone()[0]
+
         self.next(self.end)
 
     
     @step
     def end(self):
         print("Flow completed.")
+        if hasattr(self, "ingest_count"):
+            print(f"Ingestion log rows: {self.ingest_count}")
+        if hasattr(self, "pgstac_collections"):
+            print(f"Collections in pgSTAC: {self.pgstac_collections}")
 
 
 if __name__ == "__main__":
